@@ -4,6 +4,7 @@ import Prelude
 
 import Feedback.Constants as C
 import Feedback.FullGraph (FullGraph)
+import Feedback.LFOs as LFOs
 import Feedback.Types (Res, Trigger, World)
 import Type.Proxy (Proxy(..))
 import WAGS.Change (ichange')
@@ -62,31 +63,31 @@ setup (TriggeredScene { world: { buffers, waveshaperArray, periodic } }) = do
   ichange' (Proxy :: _ "padFilter3") { freq: C.padFilter3Freq, q: C.padFilter3Q }
   ichange' (Proxy :: _ "padSources") 1.0
   ichange' (Proxy :: _ "padSource0") C.padOsc0Vol
-  ichange' (Proxy :: _ "padSource0LFO") 1.0
   ichange' (Proxy :: _ "padSource0Pan") 0.0
   ichange' (Proxy :: _ "padSource0Osc") periodic -- periodic osc
   ichange' (Proxy :: _ "padSource0Osc") _on
   ichange' (Proxy :: _ "padSource1") 0.0 -- C.padOsc1Vol
-  ichange' (Proxy :: _ "padSource1LFO") 1.0
   ichange' (Proxy :: _ "padSource1Pan") 0.0
   ichange' (Proxy :: _ "padSource1Osc") C.padOsc1Freq
   ichange' (Proxy :: _ "padSource1Osc") _on
   ichange' (Proxy :: _ "padSource2") C.padOsc2Vol
-  ichange' (Proxy :: _ "padSource2LFO") 1.0
   ichange' (Proxy :: _ "padSource2Pan") 0.0
   ichange' (Proxy :: _ "padSource2Osc") C.padOsc2Freq
   ichange' (Proxy :: _ "padSource2Osc") _on
   ichange' (Proxy :: _ "padSource3") 0.0 -- C.padOsc3Vol
-  ichange' (Proxy :: _ "padSource3LFO") 1.0
   ichange' (Proxy :: _ "padSource3Pan") 0.0
   ichange' (Proxy :: _ "padSource3Osc") C.padOsc3Freq
   ichange' (Proxy :: _ "padSource3Osc") _on
   ichange' (Proxy :: _ "padSource4") 0.0 -- C.padOsc4Vol
-  ichange' (Proxy :: _ "padSource4LFO") 1.0
   ichange' (Proxy :: _ "padSource4Pan") 0.0
   ichange' (Proxy :: _ "padSource4Osc") C.padOsc4Freq
   ichange' (Proxy :: _ "padSource4Osc") _on
-  --
+  LFOs.padSource0LFO 0.0
+  LFOs.padSource1LFO 0.0
+  LFOs.padSource2LFO 0.0
+  LFOs.padSource3LFO 0.0
+  LFOs.padSource4LFO 0.0
+
 
 setup0 :: forall proof. TriggeredScene Trigger World () -> IxWAG RunAudio RunEngine proof Res FullGraph FullGraph Unit
 setup0 (TriggeredScene { world: { buffers, waveshaperArray, periodic } }) = do

@@ -15,6 +15,7 @@ import Data.Variant (default, match, onMatch)
 import Data.Vec (Vec, empty, replicate', zipWithE, (+>))
 import Feedback.Constants as C
 import Feedback.FullGraph (FullGraph)
+import Feedback.LFOs as LFOs
 import Feedback.Types (Acc, Bang, Elts(..), EnvelopeType(..), LeadSynth(..), OctaveType(..), PadT, PitchSynth(..), Res, SampleRate(..), Trigger(..), TriggerLeadInfo, WhichSample(..), World, ZeroToOne(..), ezto, onElts, unTriggerLeadNT, unTriggerOneShotNT, unUncontrollableNT, updateAtElt)
 import Math (sin, pi, pow, (%))
 import Math as M
@@ -98,41 +99,18 @@ detunePad e _ a = ChangeWrapper
   )
 
 gainLFO0Pad :: ChangeSig ZeroToOne
-gainLFO0Pad (ZeroToOne n) _ a = ChangeWrapper
-  ( ichange
-      { padSource2LFO: AudioEnvelope
-          { duration: 10000.0 + (1.0 - n) * 15000.0
-          , timeOffset: C.lfoTimeOffset
-          , values: if n < 0.5 then C.longLFOU0 else if n < 0.75 then C.longLFOU1 else if n < 0.9 then C.longLFOU2 else C.longLFOU3
-          }
-      , padSource3LFO: AudioEnvelope
-          { duration: 6600.0 + (1.0 - n) * 20000.0
-          , timeOffset: C.lfoTimeOffset
-          , values: if n < 0.4 then C.longLFOU0 else if n < 0.6 then C.longLFOU1 else if n < 0.8 then C.longLFOU2 else C.longLFOU3
-          }
-      , padSource4LFO: AudioEnvelope
-          { duration: 2500.0 + (1.0 - n) * 20000.0
-          , timeOffset: C.lfoTimeOffset
-          , values: if n < 0.25 then C.longLFOU0 else if n < 0.5 then C.longLFOU1 else if n < 0.75 then C.longLFOU2 else C.longLFOU3
-          }
-      } $> a
-  )
+gainLFO0Pad (ZeroToOne n) _ a = ChangeWrapper do
+  LFOs.padSource2LFO n
+  LFOs.padSource3LFO n
+  LFOs.padSource4LFO n
+  pure a
 
 gainLFO1Pad :: ChangeSig ZeroToOne
-gainLFO1Pad (ZeroToOne n) _ a = ChangeWrapper
-  ( ichange
-      { padSource0LFO: AudioEnvelope
-          { duration: 20000.0 + (1.0 - n) * 15000.0
-          , timeOffset: C.lfoTimeOffset
-          , values: if n < 0.8 then C.longLFOU1 else if n < 0.94 then C.longLFOU2 else C.longLFOU3
-          }
-      , padSource1LFO: AudioEnvelope
-          { duration: 15000.0 + (1.0 - n) * 20000.0
-          , timeOffset: C.lfoTimeOffset
-          , values: if n < 0.7 then C.longLFOU0 else if n < 0.8 then C.longLFOU1 else if n < 0.9 then C.longLFOU2 else C.longLFOU3
-          }
-      } $> a
-  )
+gainLFO1Pad (ZeroToOne n) _ a = ChangeWrapper do
+  LFOs.padSource0LFO n
+  LFOs.padSource1LFO n
+  pure a
+
 
 -- todo: ugh, singleNumber is a hack
 -- change should be overloaded to handle that natively
