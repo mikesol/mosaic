@@ -6,9 +6,11 @@ import Control.Parallel (parallel, sequential)
 import Data.Homogeneous.Record (fromHomogeneous, homogeneous)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (sequence, traverse)
+import Data.Tuple.Nested (type (/\))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import FRP.Event (Event, EventIO)
+import Feedback.Control (HereThere)
 import Feedback.InnerComponent as InnerComponent
 import Feedback.PubNub (PubNub, PubNubEvent(..))
 import Feedback.Types (Buffers, IncomingEvent)
@@ -26,7 +28,7 @@ type State = { buffers :: Maybe Buffers }
 
 data Action = Initialize
 
-component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> H.Component query input output m
+component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO (HereThere /\ IncomingEvent) -> PubNub -> H.Component query input output m
 component localEvent remoteEvent pubnub =
   H.mkComponent
     { initialState
@@ -46,7 +48,7 @@ initialState _ = { buffers: Nothing }
 klz :: forall r a. Array String -> IProp (class :: String | r) a
 klz = HP.classes <<< map ClassName
 
-render :: forall m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> State -> H.ComponentHTML Action Slots m
+render :: forall m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO (HereThere /\ IncomingEvent) -> PubNub -> State -> H.ComponentHTML Action Slots m
 render remoteEvent localEvent pubnub { buffers } =
   HH.div [ klz [ "w-screen", "h-screen" ] ] $
     maybe

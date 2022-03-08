@@ -9,7 +9,8 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
 import Data.Profunctor (lcmap)
 import Data.Traversable (for_)
-import Data.Tuple.Nested ((/\))
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested (type (/\), (/\))
 import Data.Typelevel.Num (D2, D3, D4, D5)
 import Data.Variant (default, inj, onMatch, match, prj)
 import Data.Vec ((+>), empty)
@@ -20,7 +21,7 @@ import Effect.Class.Console as Log
 import FRP.Event (Event, EventIO, filterMap, subscribe)
 import FRP.Event.Time (interval)
 import Feedback.Acc (initialAcc)
-import Feedback.Control (Action(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts, hashCode, normalizedWidthAndHeightSvg, reverseS)
+import Feedback.Control (Action(..), HereThere(..), MusicalAction(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts, hashCode, normalizedWidthAndHeightSvg, reverseS)
 import Feedback.Engine (piece)
 import Feedback.Oracle (oracle)
 import Feedback.PubNub (PubNub, PubNubEvent(..), PubNubMessage(..), UIEvent(..), publish)
@@ -42,7 +43,7 @@ import Type.Proxy (Proxy(..))
 import WAGS.Interpret (close, context, makeFFIAudioSnapshot, makeFloatArray, makePeriodicWave)
 import WAGS.Run (TriggeredRun, runNoLoop)
 
-component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> Buffers -> H.Component query input output m
+component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO (HereThere /\ IncomingEvent) -> PubNub -> Buffers -> H.Component query input output m
 component remoteEvent localEvent pubnub buffers =
   H.mkComponent
     { initialState
@@ -181,8 +182,8 @@ render st = case st.audioCtx of
     , SA.preserveAspectRatio Nothing SA.Slice
     , HE.onMouseMove $ lcmap normalizedWidthAndHeightSvg MouseMove
     ]
-    [ SE.g [  ] (join $ map (c2s st) $ values $ fromHomogeneous elts)
-    , SE.g [] (map (\(ix /\ v) -> SE.circle [SA.cx (1000.0 * v.x), SA.cy (1000.0 * v.y), SA.r 8.0, SA.fill (RGB (hashCode ix `mod` 256) (hashCode (reverseS ix) `mod` 256) 0)]) $ Object.toUnfoldable $ st.mice)
+    [ SE.g [] (join $ map (c2s st) $ values $ fromHomogeneous elts)
+    , SE.g [] (map (\(ix /\ v) -> SE.circle [ SA.cx (1000.0 * v.x), SA.cy (1000.0 * v.y), SA.r 8.0, SA.fill (RGB (hashCode ix `mod` 256) (hashCode (reverseS ix) `mod` 256) 0) ]) $ Object.toUnfoldable $ st.mice)
     ]
 
 makeDistortionCurve :: Number -> Array Number
@@ -336,381 +337,389 @@ et5 (Elts n) = case n of
   3 -> T5_3
   _ -> T5_4
 
-handleAction :: forall output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> Buffers -> Action -> H.HalogenM State Action () output m Unit
+usingHT :: HereThere -> ((HereThere /\ IncomingEvent) -> Effect Unit) -> IncomingEvent -> Effect Unit
+usingHT ht f i = f (ht /\ i)
+
+handleAction :: forall output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO (HereThere /\ IncomingEvent) -> PubNub -> Buffers -> Action -> H.HalogenM State Action () output m Unit
 handleAction remoteEvent localEvent pubnub buffers = case _ of
-  GainLFO0Pad sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { gainLFO0Pad = _, gainLFO0PadDown = _ } }
-    _.interactions.gainLFO0PadDown
-    _.interactions.gainLFO0Pad
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "gainLFO0Pad"
-        )
-    )
-    sliderAction
-  GainLFO1Pad sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { gainLFO1Pad = _, gainLFO1PadDown = _ } }
-    _.interactions.gainLFO1PadDown
-    _.interactions.gainLFO1Pad
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "gainLFO1Pad"
-        )
-    )
-    sliderAction
-  WaveshaperPad sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { waveshaperPad = _, waveshaperPadDown = _ } }
-    _.interactions.waveshaperPadDown
-    _.interactions.waveshaperPad
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "waveshaperPad"
-        )
-    )
-    sliderAction
-  PitchLead sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { pitchLead = _, pitchLeadDown = _ } }
-    _.interactions.pitchLeadDown
-    _.interactions.pitchLead
-    ( clamp01 >>> nFromZeroOne >>> inj
-        ( Proxy
-            :: Proxy
-                 "pitchLead"
-        )
-    )
-    sliderAction
-  LeadDelayGainCarousel sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { leadDelayGainCarousel = _, leadDelayGainCarouselDown = _ } }
-    _.interactions.leadDelayGainCarouselDown
-    _.interactions.leadDelayGainCarousel
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "leadDelayGainCarousel"
-        )
-    )
-    sliderAction
-  NPitchesPlayedLead sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { nPitchesPlayedLead = _, nPitchesPlayedLeadDown = _ } }
-    _.interactions.nPitchesPlayedLeadDown
-    _.interactions.nPitchesPlayedLead
-    ( clamp01 >>> nFromZeroOne >>> inj
-        ( Proxy
-            :: Proxy
-                 "nPitchesPlayedLead"
-        )
-    )
-    sliderAction
-  DroneLowpass0Q sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneLowpass0Q = _, droneLowpass0QDown = _ } }
-    _.interactions.droneLowpass0QDown
-    _.interactions.droneLowpass0Q
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneLowpass0Q"
-        )
-    )
-    sliderAction
-  DroneBandpass0Q sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneBandpass0Q = _, droneBandpass0QDown = _ } }
-    _.interactions.droneBandpass0QDown
-    _.interactions.droneBandpass0Q
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneBandpass0Q"
-        )
-    )
-    sliderAction
-  DroneBandpass0LFO sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneBandpass0LFO = _, droneBandpass0LFODown = _ } }
-    _.interactions.droneBandpass0LFODown
-    _.interactions.droneBandpass0LFO
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneBandpass0LFO"
-        )
-    )
-    sliderAction
-  DroneBandpass1Q sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneBandpass1Q = _, droneBandpass1QDown = _ } }
-    _.interactions.droneBandpass1QDown
-    _.interactions.droneBandpass1Q
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneBandpass1Q"
-        )
-    )
-    sliderAction
-  DroneBandpass1LFO sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneBandpass1LFO = _, droneBandpass1LFODown = _ } }
-    _.interactions.droneBandpass1LFODown
-    _.interactions.droneBandpass1LFO
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneBandpass1LFO"
-        )
-    )
-    sliderAction
-  DroneHighpass0Q sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneHighpass0Q = _, droneHighpass0QDown = _ } }
-    _.interactions.droneHighpass0QDown
-    _.interactions.droneHighpass0Q
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneHighpass0Q"
-        )
-    )
-    sliderAction
-  DroneHighpass0LFO sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneHighpass0LFO = _, droneHighpass0LFODown = _ } }
-    _.interactions.droneHighpass0LFODown
-    _.interactions.droneHighpass0LFO
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneHighpass0LFO"
-        )
-    )
-    sliderAction
-  DroneActivationEnergyThreshold sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneActivationEnergyThreshold = _, droneActivationEnergyThresholdDown = _ } }
-    _.interactions.droneActivationEnergyThresholdDown
-    _.interactions.droneActivationEnergyThreshold
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneActivationEnergyThreshold"
-        )
-    )
-    sliderAction
-  DroneDecay sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { droneDecay = _, droneDecayDown = _ } }
-    _.interactions.droneDecayDown
-    _.interactions.droneDecay
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "droneDecay"
-        )
-    )
-    sliderAction
-  SampleChooser sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { sampleChooser = _, sampleChooserDown = _ } }
-    _.interactions.sampleChooserDown
-    _.interactions.sampleChooser
-    ( clamp01 >>> nFromZeroOne >>> inj
-        ( Proxy
-            :: Proxy
-                 "sampleChooser"
-        )
-    )
-    sliderAction
-  SampleDelayGainCarousel sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { sampleDelayGainCarousel = _, sampleDelayGainCarouselDown = _ } }
-    _.interactions.sampleDelayGainCarouselDown
-    _.interactions.sampleDelayGainCarousel
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "sampleDelayGainCarousel"
-        )
-    )
-    sliderAction
-  LoopingBufferStartEndConstriction sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { loopingBufferStartEndConstriction = _, loopingBufferStartEndConstrictionDown = _ } }
-    _.interactions.loopingBufferStartEndConstrictionDown
-    _.interactions.loopingBufferStartEndConstriction
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "loopingBufferStartEndConstriction"
-        )
-    )
-    sliderAction
-  GreatAndMightyPan sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { greatAndMightyPan = _, greatAndMightyPanDown = _ } }
-    _.interactions.greatAndMightyPanDown
-    _.interactions.greatAndMightyPan
-    ( clamp01 >>> inj
-        ( Proxy
-            :: Proxy
-                 "greatAndMightyPan"
-        )
-    )
-    sliderAction
-  DistantBellsFader sliderAction -> handleSlider
-    localEvent.push
-    _ { interactions { distantBellsFader = _, distantBellsFaderDown = _ } }
-    _.interactions.distantBellsFaderDown
-    _.interactions.distantBellsFader
-    (clamp01 >>> inj (Proxy :: Proxy "distantBellsFader"))
-    sliderAction
-  --
-  TogglePadOsc0 t2 -> handleT2 localEvent.push _ { interactions { togglePadOsc0 = _ } } _.interactions.togglePadOsc0
-    (inj (Proxy :: Proxy "togglePadOsc0"))
-    t2
-  TogglePadOsc1 t2 -> handleT2 localEvent.push _ { interactions { togglePadOsc1 = _ } } _.interactions.togglePadOsc1
-    (inj (Proxy :: Proxy "togglePadOsc1"))
-    t2
-  TogglePadOsc2 t2 -> handleT2 localEvent.push _ { interactions { togglePadOsc2 = _ } } _.interactions.togglePadOsc2
-    (inj (Proxy :: Proxy "togglePadOsc2"))
-    t2
-  TogglePadOsc3 t2 -> handleT2 localEvent.push _ { interactions { togglePadOsc3 = _ } } _.interactions.togglePadOsc3
-    (inj (Proxy :: Proxy "togglePadOsc3"))
-    t2
-  TogglePadOsc4 t2 -> handleT2 localEvent.push _ { interactions { togglePadOsc4 = _ } } _.interactions.togglePadOsc4
-    (inj (Proxy :: Proxy "togglePadOsc4"))
-    t2
-  LeadDelayLine0 t2 -> handleT2 localEvent.push _ { interactions { leadDelayLine0 = _ } } _.interactions.leadDelayLine0
-    ( inj (Proxy :: Proxy "leadDelayLine0")
-    )
-    t2
-  LeadDelayLine1 t2 -> handleT2 localEvent.push _ { interactions { leadDelayLine1 = _ } } _.interactions.leadDelayLine1
-    (inj (Proxy :: Proxy "leadDelayLine1"))
-    t2
-  LeadDelayLine2 t2 -> handleT2 localEvent.push _ { interactions { leadDelayLine2 = _ } } _.interactions.leadDelayLine2
-    (inj (Proxy :: Proxy "leadDelayLine2"))
-    t2
-  LeadCombinedDelay0 t2 -> handleT2 localEvent.push _ { interactions { leadCombinedDelay0 = _ } } _.interactions.leadCombinedDelay0
-    (inj (Proxy :: Proxy "leadCombinedDelay0"))
-    t2
-  DroneFlange t2 -> handleT2 localEvent.push _ { interactions { droneFlange = _ } } _.interactions.droneFlange
-    (inj (Proxy :: Proxy "droneFlange"))
-    t2
-  SampleReverse t2 -> handleT2 localEvent.push _ { interactions { sampleReverse = _ } } _.interactions.sampleReverse
-    (inj (Proxy :: Proxy "sampleReverse"))
-    t2
-  SampleChorusEffect t2 -> handleT2 localEvent.push _ { interactions { sampleChorusEffect = _ } } _.interactions.sampleChorusEffect
-    (inj (Proxy :: Proxy "sampleChorusEffect"))
-    t2
-  SampleDelayLine0 t2 -> handleT2 localEvent.push _ { interactions { sampleDelayLine0 = _ } } _.interactions.sampleDelayLine0
-    (inj (Proxy :: Proxy "sampleDelayLine0"))
-    t2
-  SampleDelayLine1 t2 -> handleT2 localEvent.push _ { interactions { sampleDelayLine1 = _ } } _.interactions.sampleDelayLine1
-    (inj (Proxy :: Proxy "sampleDelayLine1"))
-    t2
-  SampleDelayLine2 t2 -> handleT2 localEvent.push _ { interactions { sampleDelayLine2 = _ } } _.interactions.sampleDelayLine2
-    (inj (Proxy :: Proxy "sampleDelayLine2"))
-    t2
-  SampleCombinedDelayLine0 t2 -> handleT2 localEvent.push _ { interactions { sampleCombinedDelayLine0 = _ } } _.interactions.sampleCombinedDelayLine0
-    (inj (Proxy :: Proxy "sampleCombinedDelayLine0"))
-    t2
-  LeadSampleDelayLine0 t2 -> handleT2 localEvent.push _ { interactions { leadSampleDelayLine0 = _ } } _.interactions.leadSampleDelayLine0
-    (inj (Proxy :: Proxy "leadSampleDelayLine0"))
-    t2
-  LeadSampleDelayLine1 t2 -> handleT2 localEvent.push _ { interactions { leadSampleDelayLine1 = _ } } _.interactions.leadSampleDelayLine1
-    (inj (Proxy :: Proxy "leadSampleDelayLine1"))
-    t2
-  LeadSampleDelayLine2 t2 -> handleT2 localEvent.push _ { interactions { leadSampleDelayLine2 = _ } } _.interactions.leadSampleDelayLine2
-    (inj (Proxy :: Proxy "leadSampleDelayLine2"))
-    t2
-  LoopingBufferGainDJ t2 -> handleT2 localEvent.push _ { interactions { loopingBufferGainDJ = _ } } _.interactions.loopingBufferGainDJ
-    (inj (Proxy :: Proxy "loopingBufferGainDJ"))
-    t2
-  LoopingBuffer0 t2 -> handleT2 localEvent.push _ { interactions { loopingBuffer0 = _ } } _.interactions.loopingBuffer0
-    (inj (Proxy :: Proxy "loopingBuffer0"))
-    t2
-  LoopingBuffer1 t2 -> handleT2 localEvent.push _ { interactions { loopingBuffer1 = _ } } _.interactions.loopingBuffer1
-    (inj (Proxy :: Proxy "loopingBuffer1"))
-    t2
-  LoopingBuffer2 t2 -> handleT2 localEvent.push _ { interactions { loopingBuffer2 = _ } } _.interactions.loopingBuffer2
-    (inj (Proxy :: Proxy "loopingBuffer2"))
-    t2
-  LoopingBuffer3 t2 -> handleT2 localEvent.push _ { interactions { loopingBuffer3 = _ } } _.interactions.loopingBuffer3
-    (inj (Proxy :: Proxy "loopingBuffer3"))
-    t2
-  LoopingBuffer4 t2 -> handleT2 localEvent.push _ { interactions { loopingBuffer4 = _ } } _.interactions.loopingBuffer4
-    (inj (Proxy :: Proxy "loopingBuffer4"))
-    t2
-  RadicalFlip t2 -> handleT2 localEvent.push _ { interactions { radicalFlip = _ } } _.interactions.radicalFlip
-    (inj (Proxy :: Proxy "radicalFlip"))
-    t2
-  GlobalDelay t2 -> handleT2 localEvent.push _ { interactions { globalDelay = _ } } _.interactions.globalDelay
-    (inj (Proxy :: Proxy "globalDelay"))
-    t2
-  ----
-  TriggerLead ud -> do
-    H.modify_ _ { interactions { triggerLead = ud } }
-    when ud do
-      H.liftEffect
-        $ localEvent.push
-        $ wrap
-        $ (inj (Proxy :: Proxy "triggerLead") Bang)
-  SampleOneShot ud -> do
-    H.modify_ _ { interactions { sampleOneShot = ud } }
-    when ud do
-      H.liftEffect
-        $ localEvent.push
-        $ wrap
-        $ (inj (Proxy :: Proxy "sampleOneShot") Bang)
-  UncontrollableSingleton ud -> do
-    H.modify_ _ { interactions { echoingUncontrollableSingleton = ud } }
-    when ud do
-      H.liftEffect
-        $ localEvent.push
-        $ wrap
-        $ (inj (Proxy :: Proxy "echoingUncontrollableSingleton") Bang)
-  ------
-  EnvelopeLead t3 -> handleT3 localEvent.push _ { interactions { envelopeLead = _ } } _.interactions.envelopeLead
-    (inj (Proxy :: Proxy "envelopeLead"))
-    t3
-  OctaveLead t3 -> handleT3 localEvent.push _ { interactions { octaveLead = _ } } _.interactions.octaveLead
-    (inj (Proxy :: Proxy "octaveLead"))
-    t3
-  SampleRateChange t3 -> handleT3 localEvent.push _ { interactions { sampleRateChange = _ } } _.interactions.sampleRateChange
-    (inj (Proxy :: Proxy "sampleRateChange"))
-    t3
-  ------
-  DetunePad t4 -> handleT4 localEvent.push _ { interactions { detunePad = _ } } _.interactions.detunePad
-    (inj (Proxy :: Proxy "detunePad"))
-    t4
-  ------
-  FilterBankChooserPad t5 -> handleT5 localEvent.push _ { interactions { filterBankChooserPad = _ } } _.interactions.filterBankChooserPad
-    (inj (Proxy :: Proxy "filterBankChooserPad"))
-    t5
-  DroneChooser t5 -> handleT5 localEvent.push _ { interactions { droneChooser = _ } } _.interactions.droneChooser
-    (inj (Proxy :: Proxy "droneChooser"))
-    t5
-  DroneRhythmicLoopingPiecewiseFunction t5 -> handleT5 localEvent.push _ { interactions { droneRhythmicLoopingPiecewiseFunction = _ } } _.interactions.droneRhythmicLoopingPiecewiseFunction
-    (inj (Proxy :: Proxy "droneRhythmicLoopingPiecewiseFunction"))
-    t5
-  SynthForLead t5 -> handleT5 localEvent.push _ { interactions { synthForLead = _ } } _.interactions.synthForLead
-    (inj (Proxy :: Proxy "synthForLead"))
-    t5
-  TriggerPad pa -> case pa of
-    PadUp -> H.modify_ _ { interactions { triggerPadUp = true } }
-    PadDown -> H.modify_ _ { interactions { triggerPadUp = false } }
-  Drone pa -> case pa of
-    PadUp -> H.modify_ _ { interactions { droneUp = true } }
-    PadDown -> H.modify_ _ { interactions { droneUp = false } }
+  MusicalAction hereOrThere thing ->
+    let
+      newPush = usingHT hereOrThere localEvent.push
+    in
+      case thing of
+        GainLFO0Pad sliderAction -> handleSlider
+          newPush
+          _ { interactions { gainLFO0Pad = _, gainLFO0PadDown = _ } }
+          _.interactions.gainLFO0PadDown
+          _.interactions.gainLFO0Pad
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "gainLFO0Pad"
+              )
+          )
+          sliderAction
+        GainLFO1Pad sliderAction -> handleSlider
+          newPush
+          _ { interactions { gainLFO1Pad = _, gainLFO1PadDown = _ } }
+          _.interactions.gainLFO1PadDown
+          _.interactions.gainLFO1Pad
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "gainLFO1Pad"
+              )
+          )
+          sliderAction
+        WaveshaperPad sliderAction -> handleSlider
+          newPush
+          _ { interactions { waveshaperPad = _, waveshaperPadDown = _ } }
+          _.interactions.waveshaperPadDown
+          _.interactions.waveshaperPad
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "waveshaperPad"
+              )
+          )
+          sliderAction
+        PitchLead sliderAction -> handleSlider
+          newPush
+          _ { interactions { pitchLead = _, pitchLeadDown = _ } }
+          _.interactions.pitchLeadDown
+          _.interactions.pitchLead
+          ( clamp01 >>> nFromZeroOne >>> inj
+              ( Proxy
+                  :: Proxy
+                       "pitchLead"
+              )
+          )
+          sliderAction
+        LeadDelayGainCarousel sliderAction -> handleSlider
+          newPush
+          _ { interactions { leadDelayGainCarousel = _, leadDelayGainCarouselDown = _ } }
+          _.interactions.leadDelayGainCarouselDown
+          _.interactions.leadDelayGainCarousel
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "leadDelayGainCarousel"
+              )
+          )
+          sliderAction
+        NPitchesPlayedLead sliderAction -> handleSlider
+          newPush
+          _ { interactions { nPitchesPlayedLead = _, nPitchesPlayedLeadDown = _ } }
+          _.interactions.nPitchesPlayedLeadDown
+          _.interactions.nPitchesPlayedLead
+          ( clamp01 >>> nFromZeroOne >>> inj
+              ( Proxy
+                  :: Proxy
+                       "nPitchesPlayedLead"
+              )
+          )
+          sliderAction
+        DroneLowpass0Q sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneLowpass0Q = _, droneLowpass0QDown = _ } }
+          _.interactions.droneLowpass0QDown
+          _.interactions.droneLowpass0Q
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneLowpass0Q"
+              )
+          )
+          sliderAction
+        DroneBandpass0Q sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneBandpass0Q = _, droneBandpass0QDown = _ } }
+          _.interactions.droneBandpass0QDown
+          _.interactions.droneBandpass0Q
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneBandpass0Q"
+              )
+          )
+          sliderAction
+        DroneBandpass0LFO sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneBandpass0LFO = _, droneBandpass0LFODown = _ } }
+          _.interactions.droneBandpass0LFODown
+          _.interactions.droneBandpass0LFO
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneBandpass0LFO"
+              )
+          )
+          sliderAction
+        DroneBandpass1Q sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneBandpass1Q = _, droneBandpass1QDown = _ } }
+          _.interactions.droneBandpass1QDown
+          _.interactions.droneBandpass1Q
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneBandpass1Q"
+              )
+          )
+          sliderAction
+        DroneBandpass1LFO sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneBandpass1LFO = _, droneBandpass1LFODown = _ } }
+          _.interactions.droneBandpass1LFODown
+          _.interactions.droneBandpass1LFO
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneBandpass1LFO"
+              )
+          )
+          sliderAction
+        DroneHighpass0Q sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneHighpass0Q = _, droneHighpass0QDown = _ } }
+          _.interactions.droneHighpass0QDown
+          _.interactions.droneHighpass0Q
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneHighpass0Q"
+              )
+          )
+          sliderAction
+        DroneHighpass0LFO sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneHighpass0LFO = _, droneHighpass0LFODown = _ } }
+          _.interactions.droneHighpass0LFODown
+          _.interactions.droneHighpass0LFO
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneHighpass0LFO"
+              )
+          )
+          sliderAction
+        DroneActivationEnergyThreshold sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneActivationEnergyThreshold = _, droneActivationEnergyThresholdDown = _ } }
+          _.interactions.droneActivationEnergyThresholdDown
+          _.interactions.droneActivationEnergyThreshold
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneActivationEnergyThreshold"
+              )
+          )
+          sliderAction
+        DroneDecay sliderAction -> handleSlider
+          newPush
+          _ { interactions { droneDecay = _, droneDecayDown = _ } }
+          _.interactions.droneDecayDown
+          _.interactions.droneDecay
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "droneDecay"
+              )
+          )
+          sliderAction
+        SampleChooser sliderAction -> handleSlider
+          newPush
+          _ { interactions { sampleChooser = _, sampleChooserDown = _ } }
+          _.interactions.sampleChooserDown
+          _.interactions.sampleChooser
+          ( clamp01 >>> nFromZeroOne >>> inj
+              ( Proxy
+                  :: Proxy
+                       "sampleChooser"
+              )
+          )
+          sliderAction
+        SampleDelayGainCarousel sliderAction -> handleSlider
+          newPush
+          _ { interactions { sampleDelayGainCarousel = _, sampleDelayGainCarouselDown = _ } }
+          _.interactions.sampleDelayGainCarouselDown
+          _.interactions.sampleDelayGainCarousel
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "sampleDelayGainCarousel"
+              )
+          )
+          sliderAction
+        LoopingBufferStartEndConstriction sliderAction -> handleSlider
+          newPush
+          _ { interactions { loopingBufferStartEndConstriction = _, loopingBufferStartEndConstrictionDown = _ } }
+          _.interactions.loopingBufferStartEndConstrictionDown
+          _.interactions.loopingBufferStartEndConstriction
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "loopingBufferStartEndConstriction"
+              )
+          )
+          sliderAction
+        GreatAndMightyPan sliderAction -> handleSlider
+          newPush
+          _ { interactions { greatAndMightyPan = _, greatAndMightyPanDown = _ } }
+          _.interactions.greatAndMightyPanDown
+          _.interactions.greatAndMightyPan
+          ( clamp01 >>> inj
+              ( Proxy
+                  :: Proxy
+                       "greatAndMightyPan"
+              )
+          )
+          sliderAction
+        DistantBellsFader sliderAction -> handleSlider
+          newPush
+          _ { interactions { distantBellsFader = _, distantBellsFaderDown = _ } }
+          _.interactions.distantBellsFaderDown
+          _.interactions.distantBellsFader
+          (clamp01 >>> inj (Proxy :: Proxy "distantBellsFader"))
+          sliderAction
+        --
+        TogglePadOsc0 t2 -> handleT2 newPush _ { interactions { togglePadOsc0 = _ } } _.interactions.togglePadOsc0
+          (inj (Proxy :: Proxy "togglePadOsc0"))
+          t2
+        TogglePadOsc1 t2 -> handleT2 newPush _ { interactions { togglePadOsc1 = _ } } _.interactions.togglePadOsc1
+          (inj (Proxy :: Proxy "togglePadOsc1"))
+          t2
+        TogglePadOsc2 t2 -> handleT2 newPush _ { interactions { togglePadOsc2 = _ } } _.interactions.togglePadOsc2
+          (inj (Proxy :: Proxy "togglePadOsc2"))
+          t2
+        TogglePadOsc3 t2 -> handleT2 newPush _ { interactions { togglePadOsc3 = _ } } _.interactions.togglePadOsc3
+          (inj (Proxy :: Proxy "togglePadOsc3"))
+          t2
+        TogglePadOsc4 t2 -> handleT2 newPush _ { interactions { togglePadOsc4 = _ } } _.interactions.togglePadOsc4
+          (inj (Proxy :: Proxy "togglePadOsc4"))
+          t2
+        LeadDelayLine0 t2 -> handleT2 newPush _ { interactions { leadDelayLine0 = _ } } _.interactions.leadDelayLine0
+          ( inj (Proxy :: Proxy "leadDelayLine0")
+          )
+          t2
+        LeadDelayLine1 t2 -> handleT2 newPush _ { interactions { leadDelayLine1 = _ } } _.interactions.leadDelayLine1
+          (inj (Proxy :: Proxy "leadDelayLine1"))
+          t2
+        LeadDelayLine2 t2 -> handleT2 newPush _ { interactions { leadDelayLine2 = _ } } _.interactions.leadDelayLine2
+          (inj (Proxy :: Proxy "leadDelayLine2"))
+          t2
+        LeadCombinedDelay0 t2 -> handleT2 newPush _ { interactions { leadCombinedDelay0 = _ } } _.interactions.leadCombinedDelay0
+          (inj (Proxy :: Proxy "leadCombinedDelay0"))
+          t2
+        DroneFlange t2 -> handleT2 newPush _ { interactions { droneFlange = _ } } _.interactions.droneFlange
+          (inj (Proxy :: Proxy "droneFlange"))
+          t2
+        SampleReverse t2 -> handleT2 newPush _ { interactions { sampleReverse = _ } } _.interactions.sampleReverse
+          (inj (Proxy :: Proxy "sampleReverse"))
+          t2
+        SampleChorusEffect t2 -> handleT2 newPush _ { interactions { sampleChorusEffect = _ } } _.interactions.sampleChorusEffect
+          (inj (Proxy :: Proxy "sampleChorusEffect"))
+          t2
+        SampleDelayLine0 t2 -> handleT2 newPush _ { interactions { sampleDelayLine0 = _ } } _.interactions.sampleDelayLine0
+          (inj (Proxy :: Proxy "sampleDelayLine0"))
+          t2
+        SampleDelayLine1 t2 -> handleT2 newPush _ { interactions { sampleDelayLine1 = _ } } _.interactions.sampleDelayLine1
+          (inj (Proxy :: Proxy "sampleDelayLine1"))
+          t2
+        SampleDelayLine2 t2 -> handleT2 newPush _ { interactions { sampleDelayLine2 = _ } } _.interactions.sampleDelayLine2
+          (inj (Proxy :: Proxy "sampleDelayLine2"))
+          t2
+        SampleCombinedDelayLine0 t2 -> handleT2 newPush _ { interactions { sampleCombinedDelayLine0 = _ } } _.interactions.sampleCombinedDelayLine0
+          (inj (Proxy :: Proxy "sampleCombinedDelayLine0"))
+          t2
+        LeadSampleDelayLine0 t2 -> handleT2 newPush _ { interactions { leadSampleDelayLine0 = _ } } _.interactions.leadSampleDelayLine0
+          (inj (Proxy :: Proxy "leadSampleDelayLine0"))
+          t2
+        LeadSampleDelayLine1 t2 -> handleT2 newPush _ { interactions { leadSampleDelayLine1 = _ } } _.interactions.leadSampleDelayLine1
+          (inj (Proxy :: Proxy "leadSampleDelayLine1"))
+          t2
+        LeadSampleDelayLine2 t2 -> handleT2 newPush _ { interactions { leadSampleDelayLine2 = _ } } _.interactions.leadSampleDelayLine2
+          (inj (Proxy :: Proxy "leadSampleDelayLine2"))
+          t2
+        LoopingBufferGainDJ t2 -> handleT2 newPush _ { interactions { loopingBufferGainDJ = _ } } _.interactions.loopingBufferGainDJ
+          (inj (Proxy :: Proxy "loopingBufferGainDJ"))
+          t2
+        LoopingBuffer0 t2 -> handleT2 newPush _ { interactions { loopingBuffer0 = _ } } _.interactions.loopingBuffer0
+          (inj (Proxy :: Proxy "loopingBuffer0"))
+          t2
+        LoopingBuffer1 t2 -> handleT2 newPush _ { interactions { loopingBuffer1 = _ } } _.interactions.loopingBuffer1
+          (inj (Proxy :: Proxy "loopingBuffer1"))
+          t2
+        LoopingBuffer2 t2 -> handleT2 newPush _ { interactions { loopingBuffer2 = _ } } _.interactions.loopingBuffer2
+          (inj (Proxy :: Proxy "loopingBuffer2"))
+          t2
+        LoopingBuffer3 t2 -> handleT2 newPush _ { interactions { loopingBuffer3 = _ } } _.interactions.loopingBuffer3
+          (inj (Proxy :: Proxy "loopingBuffer3"))
+          t2
+        LoopingBuffer4 t2 -> handleT2 newPush _ { interactions { loopingBuffer4 = _ } } _.interactions.loopingBuffer4
+          (inj (Proxy :: Proxy "loopingBuffer4"))
+          t2
+        RadicalFlip t2 -> handleT2 newPush _ { interactions { radicalFlip = _ } } _.interactions.radicalFlip
+          (inj (Proxy :: Proxy "radicalFlip"))
+          t2
+        GlobalDelay t2 -> handleT2 newPush _ { interactions { globalDelay = _ } } _.interactions.globalDelay
+          (inj (Proxy :: Proxy "globalDelay"))
+          t2
+        ----
+        TriggerLead ud -> do
+          H.modify_ _ { interactions { triggerLead = ud } }
+          when ud do
+            H.liftEffect
+              $ newPush
+              $ wrap
+              $ (inj (Proxy :: Proxy "triggerLead") Bang)
+        SampleOneShot ud -> do
+          H.modify_ _ { interactions { sampleOneShot = ud } }
+          when ud do
+            H.liftEffect
+              $ newPush
+              $ wrap
+              $ (inj (Proxy :: Proxy "sampleOneShot") Bang)
+        UncontrollableSingleton ud -> do
+          H.modify_ _ { interactions { echoingUncontrollableSingleton = ud } }
+          when ud do
+            H.liftEffect
+              $ newPush
+              $ wrap
+              $ (inj (Proxy :: Proxy "echoingUncontrollableSingleton") Bang)
+        ------
+        EnvelopeLead t3 -> handleT3 newPush _ { interactions { envelopeLead = _ } } _.interactions.envelopeLead
+          (inj (Proxy :: Proxy "envelopeLead"))
+          t3
+        OctaveLead t3 -> handleT3 newPush _ { interactions { octaveLead = _ } } _.interactions.octaveLead
+          (inj (Proxy :: Proxy "octaveLead"))
+          t3
+        SampleRateChange t3 -> handleT3 newPush _ { interactions { sampleRateChange = _ } } _.interactions.sampleRateChange
+          (inj (Proxy :: Proxy "sampleRateChange"))
+          t3
+        ------
+        DetunePad t4 -> handleT4 newPush _ { interactions { detunePad = _ } } _.interactions.detunePad
+          (inj (Proxy :: Proxy "detunePad"))
+          t4
+        ------
+        FilterBankChooserPad t5 -> handleT5 newPush _ { interactions { filterBankChooserPad = _ } } _.interactions.filterBankChooserPad
+          (inj (Proxy :: Proxy "filterBankChooserPad"))
+          t5
+        DroneChooser t5 -> handleT5 newPush _ { interactions { droneChooser = _ } } _.interactions.droneChooser
+          (inj (Proxy :: Proxy "droneChooser"))
+          t5
+        DroneRhythmicLoopingPiecewiseFunction t5 -> handleT5 newPush _ { interactions { droneRhythmicLoopingPiecewiseFunction = _ } } _.interactions.droneRhythmicLoopingPiecewiseFunction
+          (inj (Proxy :: Proxy "droneRhythmicLoopingPiecewiseFunction"))
+          t5
+        SynthForLead t5 -> handleT5 newPush _ { interactions { synthForLead = _ } } _.interactions.synthForLead
+          (inj (Proxy :: Proxy "synthForLead"))
+          t5
+        TriggerPad pa -> case pa of
+          PadUp -> H.modify_ _ { interactions { triggerPadUp = true } }
+          PadDown -> H.modify_ _ { interactions { triggerPadUp = false } }
+        Drone pa -> case pa of
+          PadUp -> H.modify_ _ { interactions { droneUp = true } }
+          PadDown -> H.modify_ _ { interactions { droneUp = false } }
   ---
   DoPadStuff -> do
     s <- H.get
@@ -723,14 +732,14 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
           }
       }
     H.liftEffect
-      $ localEvent.push
+      $ usingHT Here localEvent.push
       $ wrap
       $ inj (Proxy :: Proxy "triggerPad")
           { v: wrap triggerPadV
           , ud: s.interactions.triggerPadUp
           }
     H.liftEffect
-      $ localEvent.push
+      $ usingHT Here localEvent.push
       $ wrap
       $ inj (Proxy :: Proxy "drone")
           { v: wrap droneV
@@ -775,7 +784,7 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
                             remoteEvent
                         )
                         <|>
-                          inj (Proxy :: Proxy "event") <$> localEvent.event
+                          inj (Proxy :: Proxy "event") <$> (map snd localEvent.event)
                         <|>
                           (pure $ inj (Proxy :: Proxy "thunk") unit)
                     )
@@ -798,164 +807,211 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
                 { gainLFO0Pad: uzto
                     >>> SliderRemoteMove
                     >>> GainLFO0Pad
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , gainLFO1Pad: uzto
                     >>> SliderRemoteMove
                     >>> GainLFO1Pad
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , waveshaperPad: uzto
                     >>> SliderRemoteMove
                     >>> WaveshaperPad
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , pitchLead: ezto >>> uzto
                     >>> SliderRemoteMove
                     >>> PitchLead
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadDelayGainCarousel: uzto
                     >>> SliderRemoteMove
                     >>> LeadDelayGainCarousel
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , nPitchesPlayedLead: ezto >>> uzto
                     >>> SliderRemoteMove
                     >>> NPitchesPlayedLead
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneLowpass0Q: uzto
                     >>> SliderRemoteMove
                     >>> DroneLowpass0Q
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneBandpass0Q: uzto
                     >>> SliderRemoteMove
                     >>> DroneBandpass0Q
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneBandpass0LFO: uzto
                     >>> SliderRemoteMove
                     >>> DroneBandpass0LFO
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneBandpass1Q: uzto
                     >>> SliderRemoteMove
                     >>> DroneBandpass1Q
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneBandpass1LFO: uzto
                     >>> SliderRemoteMove
                     >>> DroneBandpass1LFO
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneHighpass0Q: uzto
                     >>> SliderRemoteMove
                     >>> DroneHighpass0Q
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneHighpass0LFO: uzto
                     >>> SliderRemoteMove
                     >>> DroneHighpass0LFO
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneActivationEnergyThreshold: uzto
                     >>> SliderRemoteMove
                     >>> DroneActivationEnergyThreshold
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneDecay: uzto
                     >>> SliderRemoteMove
                     >>> DroneDecay
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleChooser: ezto >>> uzto
                     >>> SliderRemoteMove
                     >>> SampleChooser
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleDelayGainCarousel: uzto
                     >>> SliderRemoteMove
                     >>> SampleDelayGainCarousel
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBufferStartEndConstriction: uzto
                     >>> SliderRemoteMove
                     >>> LoopingBufferStartEndConstriction
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , greatAndMightyPan: uzto
                     >>> SliderRemoteMove
                     >>> GreatAndMightyPan
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , distantBellsFader: uzto
                     >>> SliderRemoteMove
                     >>> DistantBellsFader
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 -----
                 , togglePadOsc0: et2
                     >>> TogglePadOsc0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , togglePadOsc1: et2
                     >>> TogglePadOsc1
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , togglePadOsc2: et2
                     >>> TogglePadOsc2
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , togglePadOsc3: et2
                     >>> TogglePadOsc3
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , togglePadOsc4: et2
                     >>> TogglePadOsc4
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadDelayLine0: et2
                     >>> LeadDelayLine0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadDelayLine1: et2
                     >>> LeadDelayLine1
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadDelayLine2: et2
                     >>> LeadDelayLine2
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadCombinedDelay0: et2
                     >>> LeadCombinedDelay0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneFlange: et2
                     >>> DroneFlange
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleReverse: et2
                     >>> SampleReverse
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleChorusEffect: et2
                     >>> SampleChorusEffect
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleDelayLine0: et2
                     >>> SampleDelayLine0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleDelayLine1: et2
                     >>> SampleDelayLine1
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleDelayLine2: et2
                     >>> SampleDelayLine2
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleCombinedDelayLine0: et2
                     >>> SampleCombinedDelayLine0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadSampleDelayLine0: et2
                     >>> LeadSampleDelayLine0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadSampleDelayLine1: et2
                     >>> LeadSampleDelayLine1
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , leadSampleDelayLine2: et2
                     >>> LeadSampleDelayLine2
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBufferGainDJ: et2
                     >>> LoopingBufferGainDJ
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBuffer0: et2
                     >>> LoopingBuffer0
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBuffer1: et2
                     >>> LoopingBuffer1
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBuffer2: et2
                     >>> LoopingBuffer2
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBuffer3: et2
                     >>> LoopingBuffer3
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , loopingBuffer4: et2
                     >>> LoopingBuffer4
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , radicalFlip: et2
                     >>> RadicalFlip
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , globalDelay: et2
                     >>> GlobalDelay
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 --
                 -- ignore remote events
@@ -974,29 +1030,37 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
                 --
                 , octaveLead: et3
                     >>> OctaveLead
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , envelopeLead: et3
                     >>> EnvelopeLead
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , sampleRateChange: et3
                     >>> SampleRateChange
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 ----
                 , detunePad: et4
                     >>> DetunePad
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 ---
                 , filterBankChooserPad: et5
                     >>> FilterBankChooserPad
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneChooser: et5
                     >>> DroneChooser
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , droneRhythmicLoopingPiecewiseFunction: et5
                     >>> DroneRhythmicLoopingPiecewiseFunction
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 , synthForLead: et5
                     >>> SynthForLead
+                    >>> MusicalAction There
                     >>> HS.notify listener
                 }
                 (default (pure unit))
@@ -1012,11 +1076,13 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
         , sampleOneShot: \_ -> pure unit
         , echoingUncontrollableSingleton: \_ -> pure unit
         }
-        ( default $ publish pubnub
-            $ PubNubMessage
-            $ inj (Proxy :: Proxy "music") e
+        ( default $ case fst e of
+            Here -> publish pubnub
+              $ PubNubMessage
+              $ inj (Proxy :: Proxy "music") (snd e)
+            There -> pure unit
         )
-        (unwrap e)
+        (unwrap (snd e))
     unsubscribe3 <- H.liftEffect $ subscribe (interval 200) \_ ->
       H.liftEffect $ HS.notify listener DoPadStuff
     subscription <- H.subscribe emitter

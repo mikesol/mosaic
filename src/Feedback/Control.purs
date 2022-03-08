@@ -40,14 +40,14 @@ data SliderAction
 data PadAction = PadDown | PadUp
 
 data Control
-  = Slider String (SliderAction -> Action) (State -> Number) Rect Color Color
-  | DiscreteChooser String (SliderAction -> Action) (State -> Number) Rect Color Color Int
-  | T2 String (T2 -> Action) (State -> T2) Rect Color Color
-  | T3 String (T3 -> Action) (State -> T3) Rect Color Color
-  | T4 String (T4 -> Action) (State -> T4) Rect Color Color
-  | T5 String (T5 -> Action) (State -> T5) Rect Color Color
-  | Pad String (PadAction -> Action) (State -> Number) Rect NNN NNN
-  | Source String (Boolean -> Action) (State -> Boolean) Rect Color Color
+  = Slider String (SliderAction -> MusicalAction) (State -> Number) Rect Color Color
+  | DiscreteChooser String (SliderAction -> MusicalAction) (State -> Number) Rect Color Color Int
+  | T2 String (T2 -> MusicalAction) (State -> T2) Rect Color Color
+  | T3 String (T3 -> MusicalAction) (State -> T3) Rect Color Color
+  | T4 String (T4 -> MusicalAction) (State -> T4) Rect Color Color
+  | T5 String (T5 -> MusicalAction) (State -> T5) Rect Color Color
+  | Pad String (PadAction -> MusicalAction) (State -> Number) Rect NNN NNN
+  | Source String (Boolean -> MusicalAction) (State -> Boolean) Rect Color Color
 
 data Action
   = StartAudio
@@ -65,7 +65,10 @@ data Action
       , publisher :: String
       }
   --
-  | GainLFO0Pad SliderAction
+  | MusicalAction HereThere MusicalAction
+
+data HereThere = Here | There
+data MusicalAction = GainLFO0Pad SliderAction
   | GainLFO1Pad SliderAction
   | WaveshaperPad SliderAction
   | PitchLead SliderAction
@@ -421,17 +424,17 @@ c2s st (Slider id actionConstructor valueReader (Rect x y w h) background foregr
         , SA.stroke (RGB 4 4 4)
         , SA.id id
         , HE.onMouseDown $ lcmap normalizedWidthAndHeight
-            ( actionConstructor
+            ( MusicalAction Here <<< actionConstructor
                 <<< SliderDown
                 <<< if useX then fst else snd
             )
         , HE.onMouseMove $ lcmap normalizedWidthAndHeight
-            ( actionConstructor
+            ( MusicalAction Here <<< actionConstructor
                 <<< SliderMove
                 <<< if useX then fst else snd
             )
         , HE.onMouseUp $ lcmap normalizedWidthAndHeight
-            (const $ actionConstructor SliderUp)
+            (const $ MusicalAction Here $ actionConstructor SliderUp)
         ]
     ]
 c2s st (DiscreteChooser id actionConstructor valueReader (Rect x y w h) background foreground mx) =
@@ -476,17 +479,17 @@ c2s st (DiscreteChooser id actionConstructor valueReader (Rect x y w h) backgrou
             , SA.stroke (RGB 4 4 4)
             , SA.id id
             , HE.onMouseDown $ lcmap normalizedWidthAndHeight
-                ( actionConstructor
+                ( MusicalAction Here <<< actionConstructor
                     <<< SliderDown
                     <<< if useX then fst else snd
                 )
             , HE.onMouseMove $ lcmap normalizedWidthAndHeight
-                ( actionConstructor
+                ( MusicalAction Here <<< actionConstructor
                     <<< SliderMove
                     <<< if useX then fst else snd
                 )
             , HE.onMouseUp $ lcmap normalizedWidthAndHeight
-                (const $ actionConstructor SliderUp)
+                (const $ MusicalAction Here $ actionConstructor SliderUp)
             ]
         ]
 c2s st (T2 id actionConstructor valueReader (Rect x y w h) bg fg) =
@@ -501,7 +504,7 @@ c2s st (T2 id actionConstructor valueReader (Rect x y w h) bg fg) =
         , SA.fill bg
         , SA.stroke (RGB 4 4 4)
         , SA.id id
-        , HE.onClick (const $ actionConstructor $ dT2 cur)
+        , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT2 cur)
         ]
     ] <> case cur of
       T2_0 -> []
@@ -512,7 +515,7 @@ c2s st (T2 id actionConstructor valueReader (Rect x y w h) bg fg) =
             , SA.r $ toNumber ((min w h) - 20) / 2.0
             -- , SA.fill fg
             , SA.stroke (RGB 4 4 4)
-            , HE.onClick (const $ actionConstructor $ dT2 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT2 cur)
             ]
         ]
 c2s st (T3 id actionConstructor valueReader (Rect x y w h) bg fg) =
@@ -527,7 +530,7 @@ c2s st (T3 id actionConstructor valueReader (Rect x y w h) bg fg) =
         , SA.fill bg
         , SA.stroke (RGB 4 4 4)
         , SA.id id
-        , HE.onClick (const $ actionConstructor $ dT3 cur)
+        , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT3 cur)
         ]
     ] <> case cur of
       T3_0 -> []
@@ -535,14 +538,14 @@ c2s st (T3 id actionConstructor valueReader (Rect x y w h) bg fg) =
         [ SE.polygon
             [ HH.attr (wrap "points") (show x <> "," <> show y <> " " <> show (x + w) <> "," <> show y <> " " <> show (x + w) <> "," <> show (y + h) <> " ")
             -- , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT3 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT3 cur)
             ]
         ]
       T3_2 ->
         [ SE.polygon
             [ HH.attr (wrap "points") (show x <> "," <> show y <> " " <> show x <> "," <> show (y + h) <> " " <> show (x + w) <> "," <> show (y + h) <> " ")
             -- , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT3 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT3 cur)
             ]
         ]
 c2s st (T4 id actionConstructor valueReader (Rect x y w h) bg fg) =
@@ -557,7 +560,7 @@ c2s st (T4 id actionConstructor valueReader (Rect x y w h) bg fg) =
         , SA.fill bg
         , SA.id id
         , SA.stroke (RGB 4 4 4)
-        , HE.onClick (const $ actionConstructor $ dT4 cur)
+        , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT4 cur)
         ]
     ] <> case cur of
       T4_0 -> []
@@ -565,21 +568,21 @@ c2s st (T4 id actionConstructor valueReader (Rect x y w h) bg fg) =
         [ SE.polygon
             [ HH.attr (wrap "points") (show x <> "," <> show y <> " " <> show (x + w) <> "," <> show y <> " " <> show (x + w) <> "," <> show (y + (h / 2)) <> " ")
             -- , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT4 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT4 cur)
             ]
         ]
       T4_2 ->
         [ SE.polygon
             [ HH.attr (wrap "points") (show x <> "," <> show (y + (h / 2)) <> " " <> show x <> "," <> show (y + h) <> " " <> show (x + w) <> "," <> show (y + h) <> " ")
             -- , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT4 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT4 cur)
             ]
         ]
       T4_3 ->
         [ SE.polygon
             [ HH.attr (wrap "points") (show x <> "," <> show (y + (h / 2)) <> " " <> show (x + w) <> "," <> show y <> " " <> show (x + w) <> "," <> show (y + h) <> " ")
             -- , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT4 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT4 cur)
             ]
         ]
 c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
@@ -594,7 +597,7 @@ c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
         , SA.height $ toNumber h
         , SA.fill bg
         , SA.stroke (RGB 4 4 4)
-        , HE.onClick (const $ actionConstructor $ dT5 cur)
+        , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT5 cur)
         ]
     ] <> case cur of
       T5_0 -> []
@@ -605,7 +608,7 @@ c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
             , SA.width $ toNumber (w / 2)
             , SA.height $ toNumber (h / 2)
             , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT5 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT5 cur)
             ]
         ]
       T5_2 ->
@@ -615,7 +618,7 @@ c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
             , SA.width $ toNumber (w / 2)
             , SA.height $ toNumber (h / 2)
             , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT5 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT5 cur)
             ]
         ]
       T5_3 ->
@@ -625,7 +628,7 @@ c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
             , SA.width $ toNumber (w / 2)
             , SA.height $ toNumber (h / 2)
             , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT5 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT5 cur)
             ]
         ]
       T5_4 ->
@@ -635,7 +638,7 @@ c2s st (T5 id actionConstructor valueReader (Rect x y w h) bg fg) =
             , SA.width $ toNumber (w / 2)
             , SA.height $ toNumber (h / 2)
             , SA.fill fg
-            , HE.onClick (const $ actionConstructor $ dT5 cur)
+            , HE.onClick (const $ MusicalAction Here $ actionConstructor $ dT5 cur)
             ]
         ]
 c2s st (Pad id actionConstructor valueReader (Rect x y w h) (c0 /\ c1 /\ c2) (d0 /\ d1 /\ d2)) =
@@ -655,8 +658,8 @@ c2s st (Pad id actionConstructor valueReader (Rect x y w h) (c0 /\ c1 /\ c2) (d0
                 (round $ calcSlope 0.0 c2 1.0 d2 cur)
             )
         , SA.stroke (RGB 4 4 4)
-        , HE.onMouseLeave $ (const $ actionConstructor PadDown)
-        , HE.onMouseEnter $ (const $ actionConstructor PadUp)
+        , HE.onMouseLeave $ (const $ MusicalAction Here $ actionConstructor PadDown)
+        , HE.onMouseEnter $ (const $ MusicalAction Here $ actionConstructor PadUp)
         ]
     ]
 c2s st (Source id actionConstructor reader (Rect x y w h) bg fg) =
@@ -668,7 +671,7 @@ c2s st (Source id actionConstructor reader (Rect x y w h) bg fg) =
       , SA.height $ toNumber h
       , SA.fill (if reader st then fg else bg)
       , SA.stroke (RGB 4 4 4)
-      , HE.onMouseDown $ (const $ actionConstructor true)
-      , HE.onMouseUp $ (const $ actionConstructor false)
+      , HE.onMouseDown $ (const $ MusicalAction Here $ actionConstructor true)
+      , HE.onMouseUp $ (const $ MusicalAction Here $ actionConstructor false)
       ]
   ]
