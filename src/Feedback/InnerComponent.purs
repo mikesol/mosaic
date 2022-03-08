@@ -4,7 +4,6 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Data.Array ((..))
-import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
@@ -21,7 +20,7 @@ import Effect.Class.Console as Log
 import FRP.Event (Event, EventIO, filterMap, subscribe)
 import FRP.Event.Time (interval)
 import Feedback.Acc (initialAcc)
-import Feedback.Control (Action(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts, hashCode, normalizedWidthAndHeight, normalizedWidthAndHeightSvg, reverseS)
+import Feedback.Control (Action(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts, hashCode, normalizedWidthAndHeightSvg, reverseS)
 import Feedback.Engine (piece)
 import Feedback.Oracle (oracle)
 import Feedback.PubNub (PubNub, PubNubEvent(..), PubNubMessage(..), UIEvent(..), publish)
@@ -42,7 +41,6 @@ import Math (abs, pi)
 import Type.Proxy (Proxy(..))
 import WAGS.Interpret (close, context, makeFFIAudioSnapshot, makeFloatArray, makePeriodicWave)
 import WAGS.Run (TriggeredRun, runNoLoop)
-import Web.UIEvent.UIEvent (UIEvent)
 
 component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> Buffers -> H.Component query input output m
 component remoteEvent localEvent pubnub buffers =
