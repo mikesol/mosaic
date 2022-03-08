@@ -13,7 +13,10 @@ exports.pubnub_ = function (listener) {
 			channels: ["feedback_diffs"],
 		});
 		pn.addListener({
-			message: function (msg) {
+			message: function (msg_) {
+					//console.log(msg);
+				var msg = Object.assign({}, msg_);
+				msg.timetoken = parseInt(msg.timetoken) / 10000;
 				if (msg.publisher !== publisher) {
 					listener(msg)();
 				}
@@ -25,7 +28,7 @@ exports.pubnub_ = function (listener) {
 
 exports.publish_ = function (pubnub) {
 	return function (message) {
-		console.log("Publishing message: " + JSON.stringify(message), "via pubnub ", pubnub);
+		// console.log("Publishing message: " + JSON.stringify(message), "via pubnub ", pubnub);
 		return function () {
 			pubnub.publish({
 				channel: "feedback_diffs",

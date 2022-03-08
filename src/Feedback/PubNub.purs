@@ -57,6 +57,7 @@ derive newtype instance fromJSONPubNubPubNubMessage :: JSON.WriteForeign PubNubM
 newtype PubNubEvent = PubNubEvent
   { publisher :: String
   , message :: PubNubMessage
+  , timetoken :: Number
   }
 
 derive instance newtypePubNubEvent :: Newtype PubNubEvent _

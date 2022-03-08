@@ -4,11 +4,14 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Data.Array ((..))
-import Data.Int (floor, toNumber)
+import Data.FunctorWithIndex (mapWithIndex)
+import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap, wrap)
+import Data.Profunctor (lcmap)
 import Data.Traversable (for_)
-import Data.Typelevel.Num (class Pos, D2, D3, D4, D5, toInt')
+import Data.Tuple.Nested ((/\))
+import Data.Typelevel.Num (D2, D3, D4, D5)
 import Data.Variant (default, inj, onMatch, match, prj)
 import Data.Vec ((+>), empty)
 import Effect (Effect)
@@ -18,25 +21,28 @@ import Effect.Class.Console as Log
 import FRP.Event (Event, EventIO, filterMap, subscribe)
 import FRP.Event.Time (interval)
 import Feedback.Acc (initialAcc)
-import Feedback.Control (Action(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts)
+import Feedback.Control (Action(..), PadAction(..), SliderAction(..), State, T2(..), T3(..), T4(..), T5(..), c2s, elts, hashCode, normalizedWidthAndHeight, normalizedWidthAndHeightSvg, reverseS)
 import Feedback.Engine (piece)
 import Feedback.Oracle (oracle)
-import Feedback.PubNub (PubNub, PubNubEvent(..), PubNubMessage(..), publish)
+import Feedback.PubNub (PubNub, PubNubEvent(..), PubNubMessage(..), UIEvent(..), publish)
 import Feedback.Setup (setup)
 import Feedback.Types (Bang(..), Buffers, Elts(..), IncomingEvent, IncomingEvent', Res, Trigger(..), ZeroToOne(..), PadT, ezto, nFromZeroOne)
 import Foreign.Object (fromHomogeneous, values)
+import Foreign.Object as Object
 import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
+import Halogen.Svg.Attributes (Color(..))
 import Halogen.Svg.Attributes as SA
 import Halogen.Svg.Elements as SE
-import Math (pi, cos, sin, abs)
+import Math (abs, pi)
 import Type.Proxy (Proxy(..))
 import WAGS.Interpret (close, context, makeFFIAudioSnapshot, makeFloatArray, makePeriodicWave)
 import WAGS.Run (TriggeredRun, runNoLoop)
+import Web.UIEvent.UIEvent (UIEvent)
 
 component :: forall query input output m. MonadEffect m => MonadAff m => Event PubNubEvent -> EventIO IncomingEvent -> PubNub -> Buffers -> H.Component query input output m
 component remoteEvent localEvent pubnub buffers =
@@ -53,6 +59,7 @@ initialState _ =
   { unsubscribe: pure unit
   , audioCtx: Nothing
   , unsubscribeHalogen: Nothing
+  , mice: Object.empty
   , interactions:
       { gainLFO0Pad: 0.0
       , gainLFO0PadDown: false
@@ -174,8 +181,11 @@ render st = case st.audioCtx of
     [ SA.classes $ map ClassName [ "w-full", "h-full" ]
     , SA.viewBox 0.0 0.0 1000.0 1000.0
     , SA.preserveAspectRatio Nothing SA.Slice
+    , HE.onMouseMove $ lcmap normalizedWidthAndHeightSvg MouseMove
     ]
-    (join $ map (c2s st) $ values $ fromHomogeneous elts)
+    [ SE.g [  ] (join $ map (c2s st) $ values $ fromHomogeneous elts)
+    , SE.g [] (map (\(ix /\ v) -> SE.circle [SA.cx (1000.0 * v.x), SA.cy (1000.0 * v.y), SA.r 8.0, SA.fill (RGB (hashCode ix `mod` 256) (hashCode (reverseS ix) `mod` 256) 0)]) $ Object.toUnfoldable $ st.mice)
+    ]
 
 makeDistortionCurve :: Number -> Array Number
 makeDistortionCurve k =
@@ -728,6 +738,24 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
           { v: wrap droneV
           , ud: s.interactions.droneUp
           }
+  MouseMove (mmx /\ mmy) -> H.liftEffect do
+    publish pubnub
+      $ PubNubMessage
+      $ inj (Proxy :: Proxy "ui")
+      $ UIEvent
+      $ inj (Proxy :: Proxy "mouse")
+      $ { x: mmx, y: mmy }
+  MoveRemoteMouse pmxy -> H.modify_ \s -> s
+    { mice = Object.alter
+        ( const $ Just
+            { timetoken: pmxy.timetoken
+            , x: pmxy.x
+            , y: pmxy.y
+            }
+        )
+        pmxy.publisher
+        s.mice
+    }
   StartAudio -> do
     handleAction remoteEvent localEvent pubnub buffers StopAudio
     audioCtx <- H.liftEffect context
@@ -763,8 +791,11 @@ handleAction remoteEvent localEvent pubnub buffers = case _ of
     { emitter, listener } <- H.liftEffect HS.create
     unsubscribe1 <- H.liftEffect $
       subscribe remoteEvent
-        ( unwrap >>> _.message >>> unwrap >>> match
-            { ui: \_ -> pure unit
+        ( \(PubNubEvent { timetoken, publisher, message }) -> (unwrap message) # match
+            { ui: unwrap >>> match
+                { mouse: \mxy -> HS.notify listener (MoveRemoteMouse { publisher, timetoken, x: mxy.x, y: mxy.y })
+                , click: \_ -> pure unit
+                }
             , music: unwrap >>> onMatch
                 { gainLFO0Pad: uzto
                     >>> SliderRemoteMove

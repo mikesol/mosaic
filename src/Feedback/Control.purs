@@ -9,9 +9,9 @@ import Data.Newtype (wrap)
 import Data.Profunctor (lcmap)
 import Data.Tuple (fst, snd)
 import Data.Tuple.Nested (type (/\), (/\))
-
 import Effect (Effect)
 import Feedback.Types (Instructions)
+import Foreign.Object (Object)
 import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -52,6 +52,18 @@ data Control
 data Action
   = StartAudio
   | StopAudio
+  | MouseMove (Number /\ Number)
+  --
+  -- phase this out, bring loop into wags
+  -- and use the res to control the UI
+  | DoPadStuff
+  --
+  | MoveRemoteMouse
+      { x :: Number
+      , y :: Number
+      , timetoken :: Number
+      , publisher :: String
+      }
   --
   | GainLFO0Pad SliderAction
   | GainLFO1Pad SliderAction
@@ -119,13 +131,12 @@ data Action
   --
   | TriggerPad PadAction
   | Drone PadAction
-  --
-  | DoPadStuff
 
 type State =
   { unsubscribe :: Effect Unit
   , unsubscribeHalogen :: Maybe SubscriptionId
   , audioCtx :: Maybe AudioContext
+  , mice :: Object { timetoken :: Number, x :: Number, y :: Number }
   , interactions ::
       { gainLFO0Pad :: Number
       , gainLFO0PadDown :: Boolean
@@ -345,10 +356,17 @@ elts =
   , distantBellsFader: Slider "DistantBellsFader" DistantBellsFader _.interactions.distantBellsFader (Rect 180 560 90 130) backgroundc foregroundc
   }
 
+foreign import reverseS :: String -> String
+foreign import hashCode :: String -> Int
 foreign import normalizedWidthAndHeight_ :: (Number -> Number -> Number /\ Number) -> MouseEvent -> Number /\ Number
+foreign import normalizedWidthAndHeightSvg_ :: (Number -> Number -> Number /\ Number) -> MouseEvent -> Number /\ Number
+
 
 normalizedWidthAndHeight :: MouseEvent -> Number /\ Number
 normalizedWidthAndHeight = normalizedWidthAndHeight_ (/\)
+
+normalizedWidthAndHeightSvg :: MouseEvent -> Number /\ Number
+normalizedWidthAndHeightSvg = normalizedWidthAndHeightSvg_ (/\)
 
 dT2 :: T2 -> T2
 dT2 T2_0 = T2_1
