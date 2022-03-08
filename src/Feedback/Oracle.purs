@@ -10,13 +10,13 @@ import Data.Array ((..))
 import Data.Foldable (foldl)
 import Data.Homogeneous.Record (fromHomogeneous, homogeneous)
 import Data.Newtype (unwrap)
-import Data.Typelevel.Num (class Pos, D14, D2, D3, D4, D5, D6, D7, D24)
-import Data.Variant (default, match, onMatch)
+import Data.Typelevel.Num (class Pos, D14, D2, D24, D3, D4, D5, D7)
+import Data.Variant (match)
 import Data.Vec (Vec, empty, replicate', zipWithE, (+>))
 import Feedback.Constants as C
 import Feedback.FullGraph (FullGraph)
 import Feedback.LFOs as LFOs
-import Feedback.Types (Acc, Bang, Elts(..), EnvelopeType(..), LeadSynth(..), OctaveType(..), PadT, PitchSynth(..), Res, SampleRate(..), Trigger(..), TriggerLeadInfo, WhichSample(..), World, ZeroToOne(..), ezto, onElts, unTriggerLeadNT, unTriggerOneShotNT, unUncontrollableNT, updateAtElt)
+import Feedback.Types (Acc, Bang, Elts(..), EnvelopeType(..), LeadSynth(..), OctaveType(..), PadT, PitchSynth(..), Res, SampleRate(..), Trigger(..), TriggerLeadInfo, WhichSample(..), World, ZeroToOne(..), onElts, unTriggerLeadNT, unTriggerOneShotNT, unUncontrollableNT, updateAtElt)
 import Math (sin, pi, pow, (%))
 import Math as M
 import Type.Proxy (Proxy(..))
@@ -26,6 +26,7 @@ import WAGS.Graph.Parameter (AudioEnvelope(..), AudioSingleNumber(..), _linearRa
 import WAGS.Math (calcSlope)
 import WAGS.Run (RunAudio, RunEngine, TriggeredScene(..))
 
+-- testing with exponential ramp
 cyclingTransitions :: forall n. Pos n => Vec n Number -> Number -> Elts n -> AudioSingleNumber
 cyclingTransitions v duration = AudioSingleNumber
   <<< { timeOffset: duration, transition: _linearRamp, param: _ }
@@ -88,8 +89,8 @@ detunePad e _ a = ChangeWrapper
           $ flap
               ( map (flip cyclingTransitions C.detuneDuration) $ homogeneous
                   { padSource0Osc: C.padOsc0Freq +> C.padOsc0Freq +> C.padOsc0Freq - 10.0 +> C.padOsc0Freq +> empty
-                  , padSource1Osc: C.padOsc0Freq +> C.padOsc0Freq + 10.0 +> C.padOsc0Freq + 30.0 +> C.padOsc0Freq - 20.0 +> empty
-                  , padSource2Osc: C.padOsc0Freq +> C.padOsc0Freq + 35.0 +> C.padOsc0Freq + 70.0 +> C.padOsc0Freq + 70.0 +> empty
+                  , padSource1Osc: C.padOsc1Freq +> C.padOsc1Freq + 10.0 +> C.padOsc1Freq + 30.0 +> C.padOsc1Freq - 20.0 +> empty
+                  , padSource2Osc: C.padOsc2Freq +> C.padOsc2Freq + 35.0 +> C.padOsc2Freq + 70.0 +> C.padOsc2Freq + 70.0 +> empty
                   , padSource3Osc: C.padOsc3Freq +> C.padOsc3Freq + 60.0 +> C.padOsc3Freq + 140.0 +> C.padOsc3Freq - 80.0 +> empty
                   , padSource4Osc: C.padOsc4Freq +> C.padOsc4Freq + 210.0 +> C.padOsc4Freq + 430.0 +> C.padOsc4Freq - 150.0 +> empty
                   }
@@ -179,7 +180,7 @@ triggerLead _ (TriggeredScene { world: { buffers } }) acc =
                   , buffers
                   } $> a { triggerLead = unwrap $ unwrapCofree a.triggerLead }
             )
-            (1 .. acc.nPitches)
+            (0 .. (acc.nPitches - 1))
         )
         acc
     )
@@ -249,38 +250,38 @@ loopingBufferSliderToVal LoopingBuffer4 false = 0.05
 loopingBufferSliderToVal LoopingBuffer4 true = 0.5
 
 leadDelaySliderToVal :: LeadDelay -> ZeroToOne -> Number
-leadDelaySliderToVal LeadDelay0 (ZeroToOne n) = (sin (2.0 * pi * n) * 0.5 + 0.5) * 0.4
-leadDelaySliderToVal LeadDelay1 (ZeroToOne n) = (sin (2.0 * pi * (n + 0.5)) * 0.5 + 0.5) * 0.3
-leadDelaySliderToVal LeadDelay2 (ZeroToOne n) = (sin (2.0 * pi * (n + 1.0)) * 0.5 + 0.5) * 0.2
-leadDelaySliderToVal LeadDelayCombined (ZeroToOne n) = (sin (2.0 * pi * (n + 1.5)) * 0.5 + 0.5) * 0.1
+leadDelaySliderToVal LeadDelay0 (ZeroToOne n) = (sin (2.0 * pi * n) * 0.5 + 0.5) * 1.0
+leadDelaySliderToVal LeadDelay1 (ZeroToOne n) = (sin (2.0 * pi * (n + 0.5)) * 0.5 + 0.5) * 1.0
+leadDelaySliderToVal LeadDelay2 (ZeroToOne n) = (sin (2.0 * pi * (n + 1.0)) * 0.5 + 0.5) * 1.0
+leadDelaySliderToVal LeadDelayCombined (ZeroToOne n) = (sin (2.0 * pi * (n + 1.5)) * 0.5 + 0.5) * 1.0
 
 fauxBool :: Elts D2 -> Boolean
 fauxBool = onElts (false +> true +> empty)
 
 leadDelayLine0 :: ChangeSig (Elts D2)
 leadDelayLine0 e _ a = ChangeWrapper
-  ( ( ichange' (Proxy :: _ "leadDelay0")
+  ( ( ichange' (Proxy :: _ "leadDelay0Gain")
         $ fadeIO (leadDelaySliderToVal LeadDelay0 a.leadDelayInfo.leadDelayGainCarousel) C.leadDelay0Duration e
     ) $> a { leadDelayInfo { leadDelayLine0 = fauxBool e } }
   )
 
 leadDelayLine1 :: ChangeSig (Elts D2)
 leadDelayLine1 e _ a = ChangeWrapper
-  ( ( ichange' (Proxy :: _ "leadDelay1")
+  ( ( ichange' (Proxy :: _ "leadDelay1Gain")
         $ fadeIO (leadDelaySliderToVal LeadDelay1 a.leadDelayInfo.leadDelayGainCarousel) C.leadDelay1Duration e
     ) $> a { leadDelayInfo { leadDelayLine1 = fauxBool e } }
   )
 
 leadDelayLine2 :: ChangeSig (Elts D2)
 leadDelayLine2 e _ a = ChangeWrapper
-  ( ( ichange' (Proxy :: _ "leadDelay2")
+  ( ( ichange' (Proxy :: _ "leadDelay2Gain")
         $ fadeIO (leadDelaySliderToVal LeadDelay2 a.leadDelayInfo.leadDelayGainCarousel) C.leadDelay2Duration e
     ) $> a { leadDelayInfo { leadDelayLine2 = fauxBool e } }
   )
 
 leadCombinedDelay0 :: ChangeSig (Elts D2)
 leadCombinedDelay0 e _ a = ChangeWrapper
-  ( ( ichange' (Proxy :: _ "leadDelayCbnd")
+  ( ( ichange' (Proxy :: _ "leadDelayCbndGain")
         $ fadeIO (leadDelaySliderToVal LeadDelayCombined a.leadDelayInfo.leadDelayGainCarousel) C.leadDelayCombinedDuration e
     ) $> a { leadDelayInfo { leadCombinedDelay0 = fauxBool e } }
   )
@@ -288,25 +289,25 @@ leadCombinedDelay0 e _ a = ChangeWrapper
 leadDelayGainCarousel :: ChangeSig ZeroToOne
 leadDelayGainCarousel z _ a = ChangeWrapper do
   CBNA.when (a.leadDelayInfo.leadDelayLine0)
-    ( \_ -> ichange' (Proxy :: _ "leadDelay0")
+    ( \_ -> ichange' (Proxy :: _ "leadDelay0Gain")
         $ AudioSingleNumber { param: leadDelaySliderToVal LeadDelay0 z, timeOffset: C.leadDelaySliderDuration, transition: _linearRamp }
     )
   CBNA.when (a.leadDelayInfo.leadDelayLine1)
-    ( \_ -> ichange' (Proxy :: _ "leadDelay1")
+    ( \_ -> ichange' (Proxy :: _ "leadDelay1Gain")
         $ AudioSingleNumber { param: leadDelaySliderToVal LeadDelay1 z, timeOffset: C.leadDelaySliderDuration, transition: _linearRamp }
     )
   CBNA.when (a.leadDelayInfo.leadDelayLine2)
-    ( \_ -> ichange' (Proxy :: _ "leadDelay2")
+    ( \_ -> ichange' (Proxy :: _ "leadDelay2Gain")
         $ AudioSingleNumber { param: leadDelaySliderToVal LeadDelay2 z, timeOffset: C.leadDelaySliderDuration, transition: _linearRamp }
     )
   CBNA.when (a.leadDelayInfo.leadCombinedDelay0)
-    ( \_ -> ichange' (Proxy :: _ "leadDelayCbnd")
+    ( \_ -> ichange' (Proxy :: _ "leadDelayCbndGain")
         $ AudioSingleNumber { param: leadDelaySliderToVal LeadDelayCombined z, timeOffset: C.leadDelaySliderDuration, transition: _linearRamp }
     )
   pure (a { leadDelayInfo { leadDelayGainCarousel = z } })
 
 nPitchesPlayedLead :: ChangeSig (Elts D7)
-nPitchesPlayedLead (Elts n) _ a = ChangeWrapper (ipure unit $> (a { nPitches = n }))
+nPitchesPlayedLead (Elts n) _ a = ChangeWrapper (ipure unit $> (a { nPitches = (n + 1) }))
 
 envelopeLead :: ChangeSig (Elts D3)
 envelopeLead e _ a = ChangeWrapper

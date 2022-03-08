@@ -45,19 +45,19 @@ waveshaperTimeOffset :: Number
 waveshaperTimeOffset = 1.0
 
 padFundamental = 83.0 :: Number
-padOsc0Vol = 0.05 :: Number
+padOsc0Vol = 0.1 :: Number
 padOsc0Duration = 4.0 :: Number
 padOsc0Freq = padFundamental :: Number
-padOsc1Vol = 0.05 :: Number
+padOsc1Vol = 0.1 :: Number
 padOsc1Duration = 4.0 :: Number
 padOsc1Freq = padFundamental * 2.0 :: Number
-padOsc2Vol = 0.05 :: Number
+padOsc2Vol = 0.1 :: Number
 padOsc2Duration = 4.0 :: Number
 padOsc2Freq = padFundamental * 3.0 :: Number
-padOsc3Vol = 0.05 :: Number
+padOsc3Vol = 0.1 :: Number
 padOsc3Duration = 4.0 :: Number
 padOsc3Freq = padFundamental * 5.0 :: Number
-padOsc4Vol = 0.05 :: Number
+padOsc4Vol = 0.1 :: Number
 padOsc4Duration = 4.0 :: Number
 padOsc4Freq = padFundamental * 8.0 :: Number
 

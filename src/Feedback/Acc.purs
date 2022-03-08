@@ -199,14 +199,11 @@ env2 :: Number -> Number
 env2 = simplePiecewise [ 0.0 /\ 0.0, 0.3 /\ 0.3, 0.75 /\ 1.0, 0.9 /\ 0.0 ]
 
 makeLeadGainInstruction :: TriggerLeadInfo -> AudioParameter
-makeLeadGainInstruction = _.envType
-  >>>
-    ( case _ of
-        Env0 -> AudioEnvelope { values: mpw env0 128, duration: 1.0, timeOffset: 0.0 }
-        Env1 -> AudioEnvelope { values: mpw env1 128, duration: 1.0, timeOffset: 0.0 }
-        Env2 -> AudioEnvelope { values: mpw env2 128, duration: 1.0, timeOffset: 0.0 }
-    )
-  >>> envelope
+makeLeadGainInstruction { envType, n, nPitches } = envelope do
+  case envType of
+    Env0 -> AudioEnvelope { values: mpw env0 128, duration: 1.0, timeOffset: toNumber n * 1.75 / toNumber nPitches }
+    Env1 -> AudioEnvelope { values: mpw env1 128, duration: 1.0, timeOffset: toNumber n * 1.75 / toNumber nPitches }
+    Env2 -> AudioEnvelope { values: mpw env2 128, duration: 1.0, timeOffset: toNumber n * 1.75 / toNumber nPitches }
 
 makeSampleBufferInstruction
   :: TriggerOneShotInfo

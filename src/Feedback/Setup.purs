@@ -65,6 +65,7 @@ setup (TriggeredScene { world: { buffers, waveshaperArray, periodic } }) = do
   ichange' (Proxy :: _ "padSource0") C.padOsc0Vol
   ichange' (Proxy :: _ "padSource0Pan") 0.0
   ichange' (Proxy :: _ "padSource0Osc") periodic -- periodic osc
+  ichange' (Proxy :: _ "padSource0Osc") C.padOsc0Freq
   ichange' (Proxy :: _ "padSource0Osc") _on
   ichange' (Proxy :: _ "padSource1") 0.0 -- C.padOsc1Vol
   ichange' (Proxy :: _ "padSource1Pan") 0.0
@@ -87,7 +88,44 @@ setup (TriggeredScene { world: { buffers, waveshaperArray, periodic } }) = do
   LFOs.padSource2LFO 0.0
   LFOs.padSource3LFO 0.0
   LFOs.padSource4LFO 0.0
-
+  --
+  ichange' (Proxy :: _ "leadMain") 1.0
+  --
+  ichange' (Proxy :: _ "leadDelay0") 1.0
+  ichange' (Proxy :: _ "leadSourcesGain0") 0.3
+  ichange' (Proxy :: _ "leadDelay0Gain") 0.0
+  ichange' (Proxy :: _ "leadHighpass0") 2500.0
+  ichange' (Proxy :: _ "leadDelayD0") 0.7
+  ----
+  ichange' (Proxy :: _ "leadDelay1") 1.0
+  ichange' (Proxy :: _ "leadSourcesGain1") 0.3
+  ichange' (Proxy :: _ "leadDelay1Gain") 0.0
+  ichange' (Proxy :: _ "leadHighpass1") 2000.0
+  ichange' (Proxy :: _ "leadDelayD1") 0.5
+  ----
+  ichange' (Proxy :: _ "leadDelay2") 1.0
+  ichange' (Proxy :: _ "leadSourcesGain2") 0.3
+  ichange' (Proxy :: _ "leadDelay2Gain") 0.0
+  ichange' (Proxy :: _ "leadHighpass2") 1500.0
+  ichange' (Proxy :: _ "leadDelayD2") 0.35
+  ----
+  ichange' (Proxy :: _ "leadDelayCbnd") 1.0
+  ichange' (Proxy :: _ "leadSourcesGainCbnd") 0.1
+  ichange' (Proxy :: _ "leadDelayCbndGain") 0.0
+  ichange' (Proxy :: _ "leadHighpassCbnd") 1000.0
+  ichange' (Proxy :: _ "leadDelayDCbnd") 0.2
+  ----
+  ichange' (Proxy :: _ "leadSources") 1.0
+  ichange' (Proxy :: _ "leadSource0") 1.0
+  --, leadSource0Buf :: TPlayBuf /\ {}
+  ichange' (Proxy :: _ "leadSource1") 1.0
+  --, leadSource1Buf :: TPlayBuf /\ {}
+  ichange' (Proxy :: _ "leadSource2") 1.0
+  --, leadSource2Buf :: TPlayBuf /\ {}
+  ichange' (Proxy :: _ "leadSource3") 1.0
+  --, leadSource3Buf :: TPlayBuf /\ {}
+  ichange' (Proxy :: _ "leadSource4") 1.0
+  --, leadSource4Buf :: TPlayBuf /\ {}
 
 setup0 :: forall proof. TriggeredScene Trigger World () -> IxWAG RunAudio RunEngine proof Res FullGraph FullGraph Unit
 setup0 (TriggeredScene { world: { buffers, waveshaperArray, periodic } }) = do
